@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Contagem de Inventário</title>
+<style>
+  :root {
+    --bg: #eef0f3;
+    --surface: #ffffff;
+    --surface-2: #f3f4f6;
+    --border: #d9dde3;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #e6eeff;
+    --ok: #15803d;
+    --warn: #b45309;
+    --bad: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --surface: #171a21; --surface-2: #20242d; --border: #2e3440;
+      --text: #e6e8ec; --muted: #9aa3b2; --accent: #6b9bff; --accent-soft: #1e2a47;
+      --ok: #22a355; --warn: #d97706; --bad: #dc4a4a;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow-x: hidden; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center;
+  }
+  .app {
+    width: 100%; max-width: 420px; min-height: 100%;
+    background: var(--surface); display: flex; flex-direction: column;
+    padding: 14px 18px 18px; gap: 14px; position: relative; overflow: hidden;
+  }
+  @media (min-width: 480px) {
+    body { align-items: flex-start; padding: 24px 0; }
+    .app {
+      margin: auto 0; min-height: min(820px, calc(100vh - 48px));
+      border-radius: 28px; border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,.12);
+    }
+  }
+
+  /* Cabeçalho: Título + ☰ */
+  .topo { display: flex; align-items: flex-start; gap: 10px; }
+  .titulo { flex: 1; min-width: 0; }
+  .titulo h1 { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+  .titulo .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .menu-btn {
+    width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 22px; cursor: pointer; flex: none;
+  }
+
+  /* Foto */
+  .foto {
+    flex: 1 1 auto; min-height: 140px; border-radius: 16px; border: 1px solid var(--border);
+    background: var(--surface-2); display: grid; place-items: center; overflow: hidden; position: relative;
+  }
+  .foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .foto .ph { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  .foto .ph b { font-size: 72px; line-height: 1; }
+
+  /* Contadores */
+  .contador { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .passo {
+    width: 64px; height: 64px; border-radius: 16px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 34px; font-weight: 600; cursor: pointer;
+    display: grid; place-items: center; user-select: none; touch-action: manipulation;
+  }
+  .passo:active { transform: scale(.94); background: var(--accent-soft); }
+  .passo.mais { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .numero {
+    width: 110px; height: 64px; text-align: center; font-size: 40px; font-weight: 700;
+    border: 1px solid transparent; border-radius: 14px; background: transparent; color: var(--text);
+    font-variant-numeric: tabular-nums; -moz-appearance: textfield; font-family: inherit;
+  }
+  .numero:focus { outline: none; border-color: var(--accent); background: var(--accent-soft); }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .rotulo-cont { text-align: center; color: var(--muted); font-size: 12px; margin-top: -8px; }
+
+  /* Validade */
+  .validade {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 54px; border-radius: 14px; border: 1.5px solid var(--text); background: var(--surface);
+    font-size: 20px; font-weight: 600; cursor: pointer; position: relative; color: var(--text);
+  }
+  .validade small { font-weight: 500; color: var(--muted); font-size: 14px; }
+  .validade input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .validade.vencido { border-color: var(--bad); color: var(--bad); }
+
+  /* Navegação */
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .seta {
+    width: 76px; height: 54px; border-radius: 14px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 28px; cursor: pointer; touch-action: manipulation;
+  }
+  .seta:active { background: var(--accent-soft); }
+  .pos { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+  /* Sem etiqueta */
+  .sem-etiqueta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding-top: 10px; border-top: 1px solid var(--border);
+  }
+  .sem-etiqueta span { font-size: 14px; color: var(--muted); margin-right: 4px; }
+  .sem-etiqueta .passo { width: 42px; height: 42px; font-size: 22px; border-radius: 10px; }
+  .sem-etiqueta .passo.mais { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .sem-etiqueta .numero { width: 64px; height: 42px; font-size: 22px; border: 1.5px solid var(--text); border-radius: 8px; }
+
+  /* Indicador de salvamento */
+  .status {
+    position: absolute; top: 16px; left: 50%; transform: translate(-50%, -70px);
+    color: #fff; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    transition: transform .2s; pointer-events: none; z-index: 10; white-space: nowrap; max-width: 92%;
+    overflow: hidden; text-overflow: ellipsis; background: var(--ok);
+  }
+  .status.show { transform: translate(-50%, 0); }
+  .status.salvando { background: var(--warn); }
+  .status.erro {
+    background: var(--bad); pointer-events: auto; cursor: pointer;
+    white-space: normal; text-align: center; width: max-content; border-radius: 14px;
+  }
+
+  /* Menu */
+  .veu { position: absolute; inset: 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  .veu.aberto { opacity: 1; pointer-events: auto; }
+  .gaveta {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 86%; max-width: 360px;
+    background: var(--surface); transform: translateX(100%); transition: transform .25s; z-index: 21;
+    display: flex; flex-direction: column; padding: 18px; gap: 14px; visibility: hidden;
+  }
+  .gaveta.aberta { transform: translateX(0); visibility: visible; }
+  .gaveta h2 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .gaveta h2 button { border: 0; background: none; font-size: 24px; color: var(--text); cursor: pointer; }
+  .gaveta input[type=search] {
+    width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--border);
+    padding: 0 14px; font: inherit; background: var(--surface-2); color: var(--text);
+  }
+  .secao { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+  .lista { flex: 1; overflow: auto; margin: 0 -18px; }
+  .lista button {
+    display: flex; width: 100%; justify-content: space-between; gap: 10px; text-align: left;
+    padding: 12px 18px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer;
+  }
+  .lista button:hover, .lista button.atual { background: var(--accent-soft); }
+  .lista small { color: var(--muted); flex: none; }
+  .lista .vazio { padding: 12px 18px; color: var(--muted); }
+  .filtro-breve { border: 1px dashed var(--border); border-radius: 12px; padding: 12px; color: var(--muted); font-size: 14px; }
+
+  /* Telas de carregando / vazio */
+  .aviso {
+    position: absolute; inset: 0; background: var(--surface); z-index: 30;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    padding: 24px; text-align: center; color: var(--muted);
+  }
+  .aviso[hidden] { display: none; }
+  .aviso button {
+    font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 10px; border: 0;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="status" id="status"></div>
+
+  <div class="topo">
+    <div class="titulo">
+      <h1 id="nome">—</h1>
+      <div class="sub" id="sku">—</div>
+    </div>
+    <button class="menu-btn" onclick="abrirMenu()" aria-label="Menu">☰</button>
+  </div>
+
+  <div class="foto" id="fotoBox">
+    <div class="ph" id="fotoPh"><b>📦</b><span>Sem foto</span></div>
+    <img id="fotoImg" alt="" hidden>
+  </div>
+
+  <div>
+    <div class="contador">
+      <button class="passo" onclick="mudar('estoque', -1)" aria-label="Diminuir quantidade">−</button>
+      <input class="numero" id="estoque" type="number" inputmode="numeric" min="0" step="1" onchange="digitar('estoque')">
+      <button class="passo mais" onclick="mudar('estoque', 1)" aria-label="Aumentar quantidade">+</button>
+    </div>
+    <div class="rotulo-cont">quantidade contada</div>
+  </div>
+
+  <label class="validade" id="valBox">
+    <span>Validade</span> <small id="valTxt">—</small>
+    <input type="date" id="validade" onchange="mudarValidade()">
+  </label>
+
+  <div class="nav">
+    <button class="seta" onclick="ir(-1)" aria-label="Produto anterior">⇦</button>
+    <span class="pos" id="pos">—</span>
+    <button class="seta" onclick="ir(1)" aria-label="Próximo produto">⇨</button>
+  </div>
+
+  <div class="sem-etiqueta">
+    <span>Sem Etiqueta</span>
+    <button class="passo" onclick="mudar('semEtiqueta', -1)" aria-label="Diminuir sem etiqueta">−</button>
+    <input class="numero" id="semEtiqueta" type="number" inputmode="numeric" min="0" step="1" onchange="digitar('semEtiqueta')">
+    <button class="passo mais" onclick="mudar('semEtiqueta', 1)" aria-label="Aumentar sem etiqueta">+</button>
+  </div>
+
+  <!-- Menu ☰ -->
+  <div class="veu" id="veu" onclick="fecharMenu()"></div>
+  <aside class="gaveta" id="gaveta">
+    <h2>Menu <button onclick="fecharMenu()" aria-label="Fechar">×</button></h2>
+    <div class="secao">Pesquisa</div>
+    <input type="search" id="busca" placeholder="Nome ou código do produto…" oninput="listar()">
+    <div class="lista" id="lista"></div>
+    <div class="secao">Filtro</div>
+    <div class="filtro-breve">Os filtros serão definidos depois.</div>
+  </aside>
+
+  <!-- Carregando / sem produtos / erro -->
+  <div class="aviso" id="aviso">Carregando produtos…</div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let produtos = [];
+  let i = 0;
+
+  /* ---------------- Carregar ---------------- */
+  function carregar() {
+    mostrarAviso('Carregando produtos…');
+    google.script.run
+      .withSuccessHandler(r => {
+        if (!r.instalado) {
+          return mostrarAviso('A aba "Produtos" ainda não existe.<br>Na planilha, use o menu <b>📦 Inventário → Instalar / reparar estrutura</b>.', true);
+        }
+        produtos = r.produtos;
+        if (!produtos.length) {
+          return mostrarAviso('Nenhum produto na aba "Produtos".<br>Cadastre os produtos na planilha e toque em recarregar.', true);
+        }
+        i = Math.min(lerPosicao(), produtos.length - 1);
+        $('aviso').hidden = true;
+        mostrar();
+      })
+      .withFailureHandler(e => mostrarAviso('Erro ao carregar: ' + esc(e.message || e), true))
+      .listarProdutos();
+  }
+
+  function mostrarAviso(html, comBotao) {
+    const a = $('aviso');
+    a.innerHTML = '<div>' + html + '</div>' + (comBotao ? '<button onclick="carregar()">⟳ Recarregar</button>' : '');
+    a.hidden = false;
+  }
+
+  /* ---------------- Mostrar produto ---------------- */
+  function mostrar() {
+    const p = produtos[i];
+    $('nome').textContent = p.nome;
+    $('sku').textContent = p.sku;
+    $('estoque').value = p.estoque;
+    $('semEtiqueta').value = p.semEtiqueta;
+    $('validade').value = p.validade || '';
+    mostrarValidade(p.validade);
+    mostrarFoto(p.foto);
+    $('pos').textContent = (i + 1) + ' de ' + produtos.length;
+    guardarPosicao();
+    // Pré-carrega a foto do próximo produto para a troca ficar rápida
+    const prox = produtos[(i + 1) % produtos.length];
+    if (prox && prox.foto) new Image().src = prox.foto;
+  }
+
+  function mostrarValidade(iso) {
+    if (iso) {
+      const [a, m, d] = iso.split('-');
+      $('valTxt').textContent = d + '/' + m + '/' + a;
+      const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+      $('valBox').classList.toggle('vencido', new Date(+a, m - 1, +d) < hoje);
+    } else {
+      $('valTxt').textContent = 'tocar para definir';
+      $('valBox').classList.remove('vencido');
+    }
+  }
+
+  function mostrarFoto(url) {
+    const img = $('fotoImg');
+    img.hidden = true;
+    $('fotoPh').hidden = false;
+    img.onload = () => { img.hidden = false; $('fotoPh').hidden = true; };
+    img.onerror = () => { img.hidden = true; $('fotoPh').hidden = false; };
+    if (url) img.src = url; else img.removeAttribute('src');
+  }
+
+  /* ---------------- Alterar valores ---------------- */
+  function mudar(campo, delta) {
+    const p = produtos[i];
+    if (!p) return;
+    const novo = Math.max(0, (p[campo] || 0) + delta);
+    if (novo === p[campo]) return;
+    p[campo] = novo;
+    $(campo).value = novo;
+    if (navigator.vibrate) navigator.vibrate(15);
+    agendar(p, campo);
+  }
+
+  function digitar(campo) {
+    const p = produtos[i];
+    if (!p) return;
+    const v = Math.max(0, parseInt($(campo).value, 10) || 0);
+    $(campo).value = v;
+    if (v === p[campo]) return;
+    p[campo] = v;
+    agendar(p, campo, 0);
+  }
+
+  function mudarValidade() {
+    const p = produtos[i];
+    if (!p) return;
+    const nova = $('validade').value || '';
+    if (nova === (p.validade || '')) return; // mesma data: nada a gravar
+    p.validade = nova;
+    mostrarValidade(p.validade);
+    agendar(p, 'validade', 0);
+  }
+
+  /* ---------------- Salvar na planilha ----------------
+     Cada toque agenda a gravação. Toques seguidos no mesmo campo são juntados
+     (espera curta) e a planilha recebe sempre o valor final — não há risco de
+     contar duas vezes. */
+  const pendentes = {};   // chave "sku|campo" → { p, campo, timer, tentativas }
+  let emAndamento = 0;
+
+  function agendar(p, campo, espera) {
+    const chave = p.sku + '|' + campo;
+    const item = pendentes[chave] || (pendentes[chave] = { p, campo, tentativas: 0 });
+    clearTimeout(item.timer);
+    item.tentativas = 0;
+    status('Salvando…', 'salvando');
+    item.timer = setTimeout(() => enviar(chave), espera === undefined ? 400 : espera);
+  }
+
+  function enviar(chave) {
+    const item = pendentes[chave];
+    if (!item) return;
+    delete pendentes[chave];
+    clearTimeout(item.timer);
+    const valor = item.p[item.campo];
+    emAndamento++;
+    google.script.run
+      .withSuccessHandler(r => {
+        emAndamento--;
+        if (r && r.linha) item.p.linha = r.linha;
+        atualizarStatus();
+      })
+      .withFailureHandler(e => {
+        emAndamento--;
+        item.tentativas++;
+        if (item.tentativas < 3) {
+          // tenta de novo em alguns segundos (internet instável, planilha ocupada…)
+          if (!pendentes[chave]) {
+            pendentes[chave] = item;
+            item.timer = setTimeout(() => enviar(chave), 1500 * item.tentativas);
+          }
+          status('Salvando… (nova tentativa)', 'salvando');
+        } else {
+          erroSalvar(item, e);
+        }
+      })
+      .salvarCampo(item.p.sku, item.p.linha, item.campo, valor);
+  }
+
+  function enviarTodos() {
+    Object.keys(pendentes).forEach(enviar);
+  }
+
+  let falhou = null;
+  function erroSalvar(item, e) {
+    falhou = item;
+    status('⚠ Não salvou ' + item.p.sku + '. Toque para tentar de novo', 'erro', true);
+    console.error(e);
+  }
+  $('status').onclick = () => {
+    if (!falhou) return;
+    const item = falhou; falhou = null;
+    agendar(item.p, item.campo, 0);
+  };
+
+  function atualizarStatus() {
+    if (falhou) return;
+    if (emAndamento > 0 || Object.keys(pendentes).length) status('Salvando…', 'salvando');
+    else status('✓ Salvo na planilha', '', false, 1200);
+  }
+
+  function status(texto, tipo, fixo, some) {
+    const s = $('status');
+    s.textContent = texto;
+    s.className = 'status show' + (tipo ? ' ' + tipo : '');
+    clearTimeout(s._t);
+    if (some) s._t = setTimeout(() => s.classList.remove('show'), some);
+  }
+
+  window.addEventListener('beforeunload', ev => {
+    if (emAndamento > 0 || Object.keys(pendentes).length) {
+      enviarTodos();
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
+
+  /* ---------------- Navegação ---------------- */
+  function ir(d) {
+    if (!produtos.length) return;
+    enviarTodos(); // grava na hora o que ainda estava esperando
+    // Dá a volta: do último vai para o primeiro e vice-versa
+    i = (i + d + produtos.length) % produtos.length;
+    mostrar();
+  }
+
+  // Deslizar o dedo para os lados sobre a foto também troca de produto
+  let x0 = null;
+  $('fotoBox').addEventListener('touchstart', e => x0 = e.touches[0].clientX, { passive: true });
+  $('fotoBox').addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) ir(dx < 0 ? 1 : -1);
+    x0 = null;
+  });
+
+  // Lembra em qual produto parou (só neste aparelho)
+  function guardarPosicao() { try { localStorage.setItem('contagem.posicao', String(i)); } catch (e) {} }
+  function lerPosicao() { try { return Math.max(0, parseInt(localStorage.getItem('contagem.posicao'), 10) || 0); } catch (e) { return 0; } }
+
+  /* ---------------- Menu: pesquisa ---------------- */
+  function abrirMenu() {
+    $('veu').classList.add('aberto');
+    $('gaveta').classList.add('aberta');
+    $('busca').value = '';
+    listar();
+  }
+  function fecharMenu() {
+    $('veu').classList.remove('aberto');
+    $('gaveta').classList.remove('aberta');
+  }
+  function semAcento(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function listar() {
+    const q = semAcento($('busca').value.trim());
+    const achados = produtos
+      .map((p, k) => ({ p, k }))
+      .filter(({ p }) => !q || semAcento(p.nome + ' ' + p.sku).includes(q))
+      .slice(0, 200);
+    $('lista').innerHTML = achados.length
+      ? achados.map(({ p, k }) =>
+          `<button class="${k === i ? 'atual' : ''}" onclick="escolher(${k})"><span>${esc(p.nome)}</span><small>${esc(p.sku)}</small></button>`
+        ).join('')
+      : '<div class="vazio">Nenhum produto encontrado.</div>';
+  }
+  function escolher(k) {
+    enviarTodos();
+    i = k;
+    mostrar();
+    fecharMenu();
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  carregar();
+</script>
+</body>
+</html>
